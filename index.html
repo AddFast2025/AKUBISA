@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Home - SDN Sidobandung II</title>
+  <style>
+
+    .btn-kanan-atas {
+      position: fixed; /* selalu ikut layar, meski discroll */
+      top: 10px;       /* jarak dari atas */
+      right: 10px;     /* jarak dari kanan */
+    }
+.btn-kanan-atas button {
+      border: none;        /* hilangkan border */
+      padding:2px 2px;  /* biar agak besar */
+      background: #3498db; /* warna biru */
+      color: blue;        /* teks putih */
+      border-radius: 10px;  /* sudut agak melengkung */
+      cursor: pointer;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, Arial, sans-serif;
+      text-align: center;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      background: linear-gradient(160deg, #e0f7fa, #b3e5fc, #81d4fa);
+    }
+
+    header img {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      background: linear-gradient(160deg, #e0f7fa, #b3e5fc, #81d4fa);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    h1 {
+      font-size: clamp(20px, 5vw, 30px);
+      margin: 0 0 28px;
+      font-weight: 700;
+    }
+
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .menu a {
+      display: block;
+      padding: 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      color: white;
+      background: #0284c7;
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .menu a:hover {
+      background: #0369a1;
+    }
+
+    .menu a:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body>
+
+  <a href="#" class="btn-kanan-atas" onclick="cekPassword(event)">
+  <button>._.</button>
+</a>
+
+<script>
+function cekPassword(event) {
+  event.preventDefault(); // cegah link langsung jalan
+
+  const input = prompt("");
+  if (input === "1") {
+    window.location.href = "saran.html";
+  } else {
+    alert("Salah!");
+  }
+}
+</script>
+  
+  <header>
+  <img 
+    src="https://i.imgur.com/RruvYpK.jpeg" 
+    alt="Logo Sekolah" 
+    width="110" 
+    height="110"
+  >
+</header>
+
+
+  <h1>Selamat Datang di SDN Sidobandung II</h1>
+
+  <nav class="menu">
+    <a href="scan1.html">📷 Scan QR Siswa</a>
+    <a href="belum_absen.html">📑 Siswa Alpha</a>
+     <a href="belum_subuh.html">📑 Siswa Tidak Lapor Subuh</a>
+    <a href="nilai.html" >📑 Nilai Siswa</a>
+    <a href="https://addfast2025.github.io/PortalSiswaSB2/" >📑 Portal Siswa</a>
+    <a href="index.html" >📑 Saran dan Masukan</a>
+
+  </nav>
+</body>
+</html>
