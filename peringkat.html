@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <title>Peringkat Nilai (Mobile)</title>
+  <title>Peringkat Nilai (Mobile – Versi Kartu)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
   <style>
@@ -14,67 +14,34 @@
       --space: 14px;
     }
 
-    @media (min-width: 768px) {
-      :root { --base-font: 16.5px; }
-    }
+    @media (min-width: 768px) { :root { --base-font: 16.5px; } }
 
     html { -webkit-text-size-adjust: 100%; }
-    body {
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      font-size: var(--base-font);
-      line-height: 1.55;
-      margin: 0; padding: 16px;
-      background: var(--bg); color: var(--text);
-    }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; font-size: var(--base-font); line-height: 1.55; margin: 0; padding: 16px; background: var(--bg); color: var(--text); }
 
     .container { width: 100%; max-width: 430px; margin: 0 auto; padding: 0 12px; }
 
     h1 { text-align:center; margin: 0 0 12px; font-size: 1.125rem; }
 
-    .toolbar {
-      position: sticky; top: 0; z-index: 5;
-      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap: wrap;
-      background: var(--bg); padding: 8px 0 12px;
-    }
+    .toolbar { position: sticky; top: 0; z-index: 5; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap: wrap; background: var(--bg); padding: 8px 0 12px; }
 
-    .bismillah {
-      font-family: 'Amiri', serif;
-      font-size: 28px; direction: rtl; color: #2c3e50; margin-bottom: 10px; text-align: center;
-    }
+    .bismillah { font-family: 'Amiri', serif; font-size: 28px; direction: rtl; color: #2c3e50; margin-bottom: 10px; text-align: center; }
 
-    .btn {
-      display:inline-flex; align-items:center; justify-content:center;
-      padding: 12px 16px; min-height: 44px;
-      border:none; background:var(--primary); color:#fff;
-      font-weight:500; border-radius:12px; cursor:pointer; font-size:1rem;
-      min-width: 100px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.08);
-      transition: transform .06s ease, opacity .2s ease;
-    }
+    .btn { display:inline-flex; align-items:center; justify-content:center; padding: 12px 16px; min-height: 44px; border:none; background:var(--primary); color:#fff; font-weight:500; border-radius:12px; cursor:pointer; font-size:1rem; min-width: 100px; box-shadow: 0 1px 2px rgba(0,0,0,.08); transition: transform .06s ease, opacity .2s ease; }
     .btn:active { transform: translateY(1px); }
     .btn:disabled { opacity:.75; cursor:not-allowed; }
 
     .muted { color: var(--muted); font-size:.95rem; font-weight:600; }
 
-    .card {
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      padding: var(--space);
-      box-shadow: 0 1px 2px rgba(0,0,0,.05);
-    }
+    .card { background:var(--card); border:1px solid var(--border); border-radius: var(--radius); padding: var(--space); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
 
     /* Searchbar di atas tabel */
-    .searchbar {
-      display:flex; gap:8px; align-items:center; margin: 10px 0 12px;
-    }
-    .searchbar input[type="search"]{
-      flex:1; min-height:44px; padding:10px 12px; border:1px solid var(--border);
-      border-radius: 10px; font-size:1rem; outline: none;
-    }
+    .searchbar { display:flex; gap:8px; align-items:center; margin: 10px 0 12px; }
+    .searchbar input[type="search"]{ flex:1; min-height:44px; padding:10px 12px; border:1px solid var(--border); border-radius: 10px; font-size:1rem; outline: none; }
     .searchbar .clear { min-width: 44px; padding:10px 12px; border:1px solid var(--border); background:#f8fafc; border-radius:10px; cursor:pointer; }
     .searchbar .count { margin-left:auto; font-size:.9rem; color:var(--muted); }
 
+    /* === Tabel default (tablet/desktop) === */
     table { width:100%; border-collapse:collapse; table-layout: auto; }
     thead th { background: var(--th); font-size: .95rem; }
     th, td { padding:12px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align: top; overflow-wrap:anywhere; word-break:break-word; }
@@ -86,40 +53,28 @@
     .col-nilai { width: 15%; text-align:center; }
     .col-durasi{ width: 22%; }
 
-    @media (max-width: 640px) {
-      body { padding: 14px; }
-      h1 { font-size: 1.05rem; }
-      .btn { min-width: 120px; padding: 12px 14px; }
-
-      table { border: 0; }
+    /* === MOBILE <= 640px: ubah setiap baris menjadi "kartu" === */
+    @media (max-width: 400px) {
+      /* Matikan scroll & header tabel, ubah baris jadi blok */
       thead { display: none; }
+      table { border: 0; }
       tbody, tr, td { display:block; width:100%; }
 
-      tbody tr {
-        background: var(--card);
-        border:1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin: 0 0 12px;
-        box-shadow: 0 1px 2px rgba(0,0,0,.04);
-      }
+      tbody tr { background: var(--card); border:1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
       tbody tr:hover td { background: transparent; }
 
-      td { border: 0; padding: 8px 0; font-size: 1rem; }
+      td { border: 0; padding: 10px 0; font-size: 1rem; }
       td + td { border-top:1px dashed var(--border); }
 
-      td::before {
-        content: attr(data-label);
-        display:block; font-size:.86rem; color: var(--muted); margin-bottom: 4px; font-weight:600;
-      }
+      /* Label kolom dari data-label */
+      td::before { content: attr(data-label); display:block; font-size:.86rem; color: var(--muted); margin-bottom: 4px; font-weight:600; }
 
-      .td-no { display:flex; justify-content:flex-start; align-items:center; gap:8px; }
+      /* Nomor peringkat ditampilkan jelas di baris pertama */
+      .td-no { display:flex; align-items:center; gap:8px; }
+      .td-no::before { content: 'No'; font-size:.86rem; color:var(--muted); font-weight:600; margin:0; }
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root { --bg:#0b0f17; --card:#0f1420; --th:#12192a; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8; }
-      tr:hover td { background:#0f172a; }
-    }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0b0f17; --card:#0f1420; --th:#12192a; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8; } tr:hover td { background:#0f172a; } }
 
     * { -webkit-tap-highlight-color: rgba(0,0,0,0.08); }
   </style>
@@ -134,7 +89,7 @@
       <button class="btn" id="btnReload" onclick="loadData()">Muat Ulang</button>
     </div>
 
-    <!-- Search di BAWAH atas tabel (di atas tabel) -->
+    <!-- Search di bawah area atas, di atas tabel -->
     <div class="searchbar">
       <input id="searchInput" type="search" placeholder="Cari nama, kelas, nilai, atau durasi…" autocomplete="off" />
       <button class="clear" id="btnClear" title="Bersihkan">✕</button>
@@ -162,8 +117,7 @@ async function loadData() {
     const json = await res.json();
     ALL_ROWS = Array.isArray(json.rows) ? json.rows : [];
     applyFilter();
-    document.getElementById('lastUpdate').textContent =
-      'Terakhir diperbarui: ' + new Date().toLocaleString('id-ID');
+    document.getElementById('lastUpdate').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleString('id-ID');
   } catch (err) {
     alert('Gagal memuat peringkat: ' + err.message);
   } finally {
@@ -241,26 +195,16 @@ function renderTable(rows){
   host.appendChild(tbl);
 }
 
-function safeText(s){
-  return String(s ?? '').trim();
-}
+function safeText(s){ return String(s ?? '').trim(); }
 
 // Event: pencarian dengan debounce
 const $input = document.getElementById('searchInput');
 const $clear = document.getElementById('btnClear');
 $input.addEventListener('input', () => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    currentQuery = $input.value;
-    applyFilter();
-  }, 150);
+  debounceTimer = setTimeout(() => { currentQuery = $input.value; applyFilter(); }, 150);
 });
-$clear.addEventListener('click', () => {
-  $input.value = '';
-  currentQuery = '';
-  applyFilter();
-  $input.focus();
-});
+$clear.addEventListener('click', () => { $input.value = ''; currentQuery = ''; applyFilter(); $input.focus(); });
 
 // Load awal
 loadData();
