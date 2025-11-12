@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Input Bank Soal (Lokal)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin: auto; }
+    h2 { text-align: center; }
+    label { font-weight: bold; margin-top: 12px; display: block; }
+    input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .uploader { border: 1px dashed #bbb; padding: 10px; border-radius: 8px; }
+    .uploader h4 { margin: 0 0 8px 0; font-size: 14px; }
+    .preview { max-width: 100%; margin-top: 8px; display: none; border-radius: 6px; }
+    button { width: 100%; padding: 12px; margin-top: 20px; background: #1976D2; border: none; color: white; font-weight: bold; border-radius: 6px; font-size: 15px; }
+    button[disabled] { opacity: 0.7; cursor: not-allowed; }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+    #popup { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 999; }
+    #popupBox { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 360px; text-align: center; }
+    #popupClose { margin-top: 15px; width: 100%; background: #444; color:#fff; }
+    #previewModal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:1000; }
+    #previewCard { background:#fff; width:min(900px, 95%); max-height:90vh; overflow:auto; border-radius:12px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body>
+<h2>Input Bank Soal</h2>
+
+<!-- ====== CONFIG client ====== -->
+<script>
+const BASE_URL = "https://script.google.com/macros/s/AKfycby10-4S8FtAEzrinBTef9PTuJSHTR4dx3kYSm4EYbkLB7IVoflazLy8a8sB_aDvs4Qh/exec"; // ganti dengan URL /exec kamu
+const API_KEY  = "soal1"; // sama dengan di Code.gs
+
+function toForm(data) {
+  // Ubah object menjadi x-www-form-urlencoded
+  return Object.entries(data)
+    .map(([k,v]) => encodeURIComponent(k) + "=" + encodeURIComponent(typeof v === "object" ? JSON.stringify(v) : v))
+    .join("&");
+}
+
+async function api(action, payload = {}) {
+  const body = toForm({ action, apiKey: API_KEY, ...payload });
+  const res = await fetch(BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) {
+    const msg = json?.data?.message || json?.message || res.statusText;
+    throw new Error(msg || "Request failed");
+  }
+  return json.data;
+}
+</script>
+
+<label>Pilih Kisi-kisi</label>
+<div class="row" style="grid-template-columns: 1fr auto;">
+  <select id="kisi" style="width:auto;"></select>
+  <button style="background:#388E3C; width:auto;" onclick="promptTambah()">+ Baru</button>
+</div>
+
+<label>Soal</label>
+<textarea id="soal"></textarea>
+
+<div class="uploader" style="margin-top:12px;">
+  <h4>Gambar Soal (opsional)</h4>
+  <input type="file" id="file_soal" accept="image/*" onchange="encodeImage('file_soal','soal')">
+  <img id="prev_soal" class="preview">
+  <input type="hidden" id="b64_soal">
+  <input type="hidden" id="name_soal">
+  <input type="hidden" id="mime_soal">
+</div>
+
+<div class="row" style="margin-top:12px;">
+  <div>
+    <label>Opsi A</label>
+    <input type="text" id="opsiA">
+    <div class="uploader">
+      <h4>Gambar Opsi A (opsional)</h4>
+      <input type="file" id="file_a" accept="image/*" onchange="encodeImage('file_a','a')">
+      <img id="prev_a" class="preview">
+      <input type="hidden" id="b64_a"><input type="hidden" id="name_a"><input type="hidden" id="mime_a">
+    </div>
+  </div>
+  <div>
+    <label>Opsi B</label>
+    <input type="text" id="opsiB">
+    <div class="uploader">
+      <h4>Gambar Opsi B (opsional)</h4>
+      <input type="file" id="file_b" accept="image/*" onchange="encodeImage('file_b','b')">
+      <img id="prev_b" class="preview">
+      <input type="hidden" id="b64_b"><input type="hidden" id="name_b"><input type="hidden" id="mime_b">
+    </div>
+  </div>
+</div>
+
+<div class="row" style="margin-top:12px;">
+  <div>
+    <label>Opsi C</label>
+    <input type="text" id="opsiC">
+    <div class="uploader">
+      <h4>Gambar Opsi C (opsional)</h4>
+      <input type="file" id="file_c" accept="image/*" onchange="encodeImage('file_c','c')">
+      <img id="prev_c" class="preview">
+      <input type="hidden" id="b64_c"><input type="hidden" id="name_c"><input type="hidden" id="mime_c">
+    </div>
+  </div>
+  <div>
+    <label>Opsi D (boleh kosong)</label>
+    <input type="text" id="opsiD" oninput="updateKunci()">
+    <div class="uploader">
+      <h4>Gambar Opsi D (opsional)</h4>
+      <input type="file" id="file_d" accept="image/*" onchange="encodeImage('file_d','d')">
+      <img id="prev_d" class="preview">
+      <input type="hidden" id="b64_d"><input type="hidden" id="name_d"><input type="hidden" id="mime_d">
+    </div>
+  </div>
+</div>
+
+<label>Kunci Jawaban</label>
+<select id="kunci">
+  <option value="">-- pilih kunci --</option>
+  <option value="a">A</option>
+  <option value="b">B</option>
+  <option value="c">C</option>
+  <option value="d" id="kunciD">D</option>
+</select>
+
+<label>Skor</label>
+<input type="number" id="skor" value="1" min="0" step="1">
+
+<div class="row" style="grid-template-columns: 1fr 1fr; margin-top: 16px;">
+  <button id="btnPreview" style="background:#6c757d;" onclick="openPreview()">PREVIEW</button>
+  <button id="btnSimpan" onclick="simpan()">SIMPAN SOAL</button>
+</div>
+
+<div id="popup">
+  <div id="popupBox">
+    <div id="popupMsg">...</div>
+    <button id="popupClose" onclick="closePopup()">Tutup</button>
+  </div>
+</div>
+
+<div id="previewModal">
+  <div id="previewCard">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <h3 style="margin:0;">Preview Soal</h3>
+      <button onclick="closePreview()" style="background:#444; color:#fff; padding:8px 12px; border:none; border-radius:8px;">Tutup</button>
+    </div>
+    <div id="previewContent" style="margin-top:12px;"></div>
+    <div style="display:flex; gap:12px; margin-top:16px;">
+      <button onclick="printPreview()" style="background:#0D6EFD; color:#fff; border:none; padding:10px 14px; border-radius:8px;">Cetak / Simpan PDF</button>
+      <button onclick="closePreview(); simpan();" style="background:#198754; color:#fff; border:none; padding:10px 14px; border-radius:8px;">Simpan dari Preview</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   Inisialisasi dropdown sheet
+   ========================= */
+(async function initSheets(){
+  try {
+    const { sheets } = await api("getsheets");
+    const sel = document.getElementById("kisi");
+    (sheets || []).forEach(n => {
+      const opt = document.createElement("option");
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    showPopup("Gagal memuat daftar kisi: " + e.message);
+  }
+})();
+
+/* =========================
+   Popup helpers
+   ========================= */
+function showPopup(msg){ document.getElementById("popupMsg").innerText = msg; document.getElementById("popup").style.display = "flex"; }
+function closePopup(){ document.getElementById("popup").style.display = "none"; }
+
+/* =========================
+   Validasi & UI helpers
+   ========================= */
+function validasi() {
+  const wajib = ["soal","opsiA","opsiB","opsiC","kunci","skor"];
+  for (let id of wajib){
+    if (String(document.getElementById(id).value || "").trim() === "") {
+      showPopup("Field A, B, C, Soal, Kunci, dan Skor wajib diisi.");
+      return false;
+    }
+  }
+  if (document.getElementById("opsiD").value.trim() === "" && document.getElementById("kunci").value === "d") {
+    showPopup("Kunci D tidak valid karena opsi D kosong.");
+    return false;
+  }
+  return true;
+}
+
+function updateKunci(){
+  const opsiD = document.getElementById("opsiD").value.trim();
+  const optD = document.getElementById("kunciD");
+  if (opsiD === "") {
+    optD.style.display = "none";
+    if (document.getElementById("kunci").value === "d") document.getElementById("kunci").value = "";
+  } else {
+    optD.style.display = "block";
+  }
+}
+
+function resetForm() {
+  ["soal","opsiA","opsiB","opsiC","opsiD"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("kunci").value = "";
+  document.getElementById("skor").value = "1";
+  ["soal","a","b","c","d"].forEach(p => {
+    const f = document.getElementById("file_"+p); if (f) f.value = "";
+    ["b64_","name_","mime_"].forEach(pref => { const el = document.getElementById(pref+p); if (el) el.value = ""; });
+    const img = document.getElementById("prev_"+p);
+    if (img){ img.src = ""; img.style.display = "none"; }
+  });
+  updateKunci();
+}
+
+function collectTextData() {
+  return {
+    kisi : document.getElementById("kisi").value,
+    soal : document.getElementById("soal").value,
+    opsiA: document.getElementById("opsiA").value,
+    opsiB: document.getElementById("opsiB").value,
+    opsiC: document.getElementById("opsiC").value,
+    opsiD: document.getElementById("opsiD").value,
+    kunci: document.getElementById("kunci").value,
+    skor : document.getElementById("skor").value
+  };
+}
+
+/* =========================
+   Upload batch ke server
+   ========================= */
+async function uploadAllGambar(payload) {
+  const slots = ["soal","a","b","c","d"];
+  for (const p of slots) {
+    const b64  = document.getElementById("b64_"+p).value;
+    const name = document.getElementById("name_"+p).value;
+    const mime = document.getElementById("mime_"+p).value;
+
+    if (b64) {
+      try {
+        const { url } = await api("uploadgambar", { base64: b64, filename: name, mime });
+        payload["gambar_" + p] = url || "";
+      } catch (e) {
+        console.error("Upload gagal ("+p+"): " + e.message);
+        payload["gambar_" + p] = "";
+      }
+    } else {
+      payload["gambar_" + p] = ""; // tidak ada gambar untuk slot ini
+    }
+  }
+}
+
+/* =========================
+   SIMPAN
+   ========================= */
+async function simpan(){
+  if (!validasi()) return;
+  const btn = document.getElementById("btnSimpan");
+  btn.disabled = true; btn.textContent = "Menyimpan...";
+  try {
+    const data = collectTextData();
+    await uploadAllGambar(data);
+    const resp = await api("simpansoal", { data }); // data akan di-JSON.stringify di toForm()
+    showPopup(resp.message || "Sukses.");
+    resetForm();
+  } catch (e) {
+    showPopup("Gagal menyimpan: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "SIMPAN SOAL";
+  }
+}
+
+/* =========================
+   Tambah sheet (kisi-kisi)
+   ========================= */
+async function promptTambah(){
+  const nama = prompt("Masukkan nama kisi-kisi baru:");
+  if (!nama) return;
+  try {
+    const resp = await api("tambahkisi", { nama });
+    showPopup(resp.message || "Berhasil.");
+    // refresh dropdown
+    const { sheets } = await api("getsheets");
+    const sel = document.getElementById("kisi");
+    sel.innerHTML = "";
+    (sheets || []).forEach(n => {
+      const opt = document.createElement("option");
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    showPopup("Gagal membuat kisi: " + e.message);
+  }
+}
+
+/* ============================================================
+   KOMPRESI GAMBAR CLIENT-SIDE (resize + re-encode + preview)
+   (SALINAN PENUH DARI KODE-MU, TANPA PERUBAHAN SIGNIFIKAN)
+   ============================================================ */
+
+// Batasi dimensi ke "seukuran HP"
+function getPhoneTargetSize() {
+  const dpr = window.devicePixelRatio || 1;
+  const wpx = Math.round(window.innerWidth  * dpr);
+  const hpx = Math.round(window.innerHeight * dpr);
+  const MIN = 720, MAX = 1440;
+  const longest = Math.max(wpx, hpx);
+  const shortest = Math.min(wpx, hpx);
+  const targetLongest = Math.max(MIN, Math.min(MAX, longest));
+  const targetShortest = Math.max(shortest, Math.round(targetLongest * 9/16));
+  const isLandscape = wpx >= hpx;
+  return isLandscape ? { maxW: targetLongest, maxH: targetShortest }
+                     : { maxW: targetShortest, maxH: targetLongest };
+}
+
+function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Gagal memuat gambar.")); };
+    img.src = url;
+  });
+}
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => {
+    if (canvas.toBlob) {
+      canvas.toBlob((blob) => resolve(blob), type, quality);
+    } else {
+      const dataUrl = canvas.toDataURL(type, quality);
+      const byteString = atob(dataUrl.split(',')[1]);
+      const mime = dataUrl.split(',')[0].match(/:(.*?);/)[1] || type || 'image/jpeg';
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      resolve(new Blob([ab], { type: mime }));
+    }
+  });
+}
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
+}
+async function detectTransparency(img, targetW, targetH) {
+  const c = document.createElement('canvas');
+  c.width = Math.min(64, targetW);
+  c.height = Math.min(64, targetH);
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  const data = ctx.getImageData(0, 0, c.width, c.height).data;
+  for (let i = 3; i < data.length; i += 4) if (data[i] < 255) return true;
+  return false;
+}
+async function fillPreviewAndHidden(prefix, dataUrl, mime, originalFile) {
+  const imgPrev = document.getElementById("prev_" + prefix);
+  imgPrev.src = dataUrl;
+  imgPrev.style.display = "block";
+  const base64 = dataUrl.split(",")[1];
+  document.getElementById("b64_" + prefix).value = base64;
+  const ext = mime === 'image/png' ? '.png' : (mime === 'image/webp' ? '.webp' : '.jpg');
+  const safeName = (originalFile?.name || ("gambar_" + Date.now())).replace(/\.[^.]+$/, '');
+  document.getElementById("name_" + prefix).value = safeName + "-compressed" + ext;
+  document.getElementById("mime_" + prefix).value = mime || (ext === '.png' ? 'image/png' : 'image/jpeg');
+}
+const JPEG_QUALITY  = 0.8;
+const POST_MAX_BYTES = 3 * 1024 * 1024;
+
+async function encodeImage(inputId, prefix) {
+  try {
+    const input = document.getElementById(inputId);
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (/image\/heic|image\/heif/i.test(file.type)) {
+      showPopup("Format HEIC/HEIF belum didukung oleh browser. Silakan konversi ke JPG/PNG terlebih dulu.");
+      input.value = "";
+      return;
+    }
+    const img = await fileToImage(file);
+    const { maxW, maxH } = getPhoneTargetSize();
+    let targetW = img.width, targetH = img.height;
+    const scaleW = maxW / targetW, scaleH = maxH / targetH;
+    const scale  = Math.min(1, scaleW, scaleH);
+    targetW = Math.round(targetW * scale);
+    targetH = Math.round(targetH * scale);
+    const hasAlpha = await detectTransparency(img, targetW, targetH);
+    let outType = hasAlpha ? 'image/png' : 'image/jpeg';
+    let outQuality = hasAlpha ? undefined : JPEG_QUALITY;
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW; canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!hasAlpha && outType === 'image/jpeg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetW, targetH);
+    }
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+    let blob = await canvasToBlob(canvas, outType, outQuality);
+    if (blob.size > POST_MAX_BYTES && outType === 'image/jpeg' && JPEG_QUALITY > 0.5) {
+      const retryQ = Math.max(0.5, JPEG_QUALITY - 0.2);
+      const blobRetry = await canvasToBlob(canvas, outType, retryQ);
+      if (blobRetry.size < blob.size) blob = blobRetry;
+    }
+    const dataUrl = await blobToDataURL(blob);
+    await fillPreviewAndHidden(prefix, dataUrl, blob.type, file);
+    if (blob.size > POST_MAX_BYTES) {
+      showPopup(
+        "Peringatan: ukuran " + prefix.toUpperCase() + " setelah kompres " +
+        (blob.size/1024/1024).toFixed(2) + " MB (> " + (POST_MAX_BYTES/1024/1024).toFixed(1) + " MB)."
+      );
+    }
+  } catch (e) {
+    console.error(e);
+    showPopup("Gagal memproses gambar " + prefix.toUpperCase());
+  }
+}
+
+/* =========================
+   PREVIEW Soal (modal)
+   ========================= */
+function getPreviewSrc(prefix) {
+  const img = document.getElementById("prev_"+prefix);
+  if (img && img.style.display !== "none" && img.src) return img.src;
+  return null;
+}
+function renderOption(letter, text, imgSrc, isKey) {
+  const wrap = document.createElement("div");
+  wrap.style.border = "1px solid #e5e7eb";
+  wrap.style.borderRadius = "10px";
+  wrap.style.padding = "12px";
+  wrap.style.background = isKey ? "#e7f7ee" : "#fff";
+  wrap.style.display = "grid";
+  wrap.style.gridTemplateColumns = imgSrc ? "64px 1fr 120px" : "64px 1fr";
+  wrap.style.gap = "12px";
+  wrap.style.alignItems = "center";
+
+  const badge = document.createElement("div");
+  badge.textContent = letter.toUpperCase();
+  badge.style.fontWeight = "bold";
+  badge.style.background = isKey ? "#198754" : "#0d6efd";
+  badge.style.color = "#fff";
+  badge.style.width = "40px";
+  badge.style.height = "40px";
+  badge.style.display = "flex";
+  badge.style.alignItems = "center";
+  badge.style.justifyContent = "center";
+  badge.style.borderRadius = "999px";
+  badge.style.fontSize = "16px";
+
+  const txt = document.createElement("div");
+  txt.textContent = text || "(kosong)";
+  txt.style.whiteSpace = "pre-wrap";
+
+  wrap.appendChild(badge);
+  wrap.appendChild(txt);
+
+  if (imgSrc) {
+    const img = document.createElement("img");
+    img.src = imgSrc;
+    img.alt = "gambar opsi " + letter.toUpperCase();
+    img.style.maxWidth = "120px";
+    img.style.maxHeight = "120px";
+    img.style.borderRadius = "8px";
+    img.style.objectFit = "contain";
+    wrap.appendChild(img);
+  }
+  return wrap;
+}
+function openPreview() {
+  if (!validasi()) return;
+
+  const kisi  = document.getElementById("kisi").value;
+  const soal  = document.getElementById("soal").value;
+  const skor  = document.getElementById("skor").value;
+  const kunci = (document.getElementById("kunci").value || "").toLowerCase();
+
+  const opsi = {
+    a: document.getElementById("opsiA").value,
+    b: document.getElementById("opsiB").value,
+    c: document.getElementById("opsiC").value,
+    d: document.getElementById("opsiD").value
+  };
+
+  const imgSoal = getPreviewSrc("soal");
+  const imgA = getPreviewSrc("a");
+  const imgB = getPreviewSrc("b");
+  const imgC = getPreviewSrc("c");
+  const imgD = getPreviewSrc("d");
+
+  const host = document.getElementById("previewContent");
+  host.innerHTML = "";
+
+  const meta = document.createElement("div");
+  meta.style.display = "flex";
+  meta.style.flexWrap = "wrap";
+  meta.style.gap = "12px";
+  meta.style.marginBottom = "10px";
+  meta.innerHTML = `
+    <div style="padding:6px 10px; background:#f1f5f9; border-radius:8px;">Kisi: <b>${kisi || "-"}</b></div>
+    <div style="padding:6px 10px; background:#f1f5f9; border-radius:8px;">Skor: <b>${skor}</b></div>
+    <div style="padding:6px 10px; background:#f1f5f9; border-radius:8px;">Kunci: <b>${kunci ? kunci.toUpperCase() : "-"}</b></div>
+  `;
+  host.appendChild(meta);
+
+  const card = document.createElement("div");
+  card.style.border = "1px solid #e5e7eb";
+  card.style.borderRadius = "12px";
+  card.style.padding = "14px";
+  card.style.background = "#fff";
+  card.style.display = "grid";
+  card.style.gap = "12px";
+
+  const soalEl = document.createElement("div");
+  soalEl.style.fontWeight = "600";
+  soalEl.style.fontSize = "16px";
+  soalEl.style.whiteSpace = "pre-wrap";
+  soalEl.textContent = soal;
+  card.appendChild(soalEl);
+
+  if (imgSoal) {
+    const g = document.createElement("img");
+    g.src = imgSoal;
+    g.alt = "gambar soal";
+    g.style.maxWidth = "100%";
+    g.style.maxHeight = "300px";
+    g.style.objectFit = "contain";
+    g.style.borderRadius = "8px";
+    card.appendChild(g);
+  }
+
+  const list = document.createElement("div");
+  list.style.display = "grid";
+  list.style.gap = "10px";
+  list.appendChild(renderOption("a", opsi.a, imgA, kunci === "a"));
+  list.appendChild(renderOption("b", opsi.b, imgB, kunci === "b"));
+  list.appendChild(renderOption("c", opsi.c, imgC, kunci === "c"));
+  if ((opsi.d || "").trim() !== "") list.appendChild(renderOption("d", opsi.d, imgD, kunci === "d"));
+
+  card.appendChild(list);
+  host.appendChild(card);
+
+  document.getElementById("previewModal").style.display = "flex";
+}
+function closePreview() {
+  document.getElementById("previewModal").style.display = "none";
+}
+function printPreview() {
+  const content = document.getElementById("previewContent").innerHTML;
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) return alert("Popup diblokir. Izinkan popup untuk mencetak.");
+  w.document.write(`
+    <html>
+      <head>
+        <title>Preview Soal</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { font-size: 18px; }
+          img { max-width: 100%; }
+          @page { size: A4; margin: 12mm; }
+        </style>
+      </head>
+      <body>
+        <h1>Preview Soal</h1>
+        ${content}
+      </body>
+    </html>
+  `);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+</script>
+</body>
+</html>
