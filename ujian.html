@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>Ujian Online (Self-hosted)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --border:#e5e7eb; --muted:#f8fafc; --primary:#0d6efd; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 960px; margin: auto; background:#fafafa; }
+    h1 { text-align:center; margin:0 0 16px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:12px; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    label { font-weight:bold; display:block; margin-bottom:6px; }
+    input[type="text"] { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; }
+    .qimg, .optimg { max-width:100%; border-radius:8px; object-fit:contain; }
+    .qimg { max-height:300px; margin-top:8px; }
+    .question { display:grid; gap:10px; }
+    .opts { display:grid; gap:8px; }
+    .opt { border:1px solid var(--border); border-radius:10px; padding:10px; background:#fff; }
+    .opt label { font-weight:normal; display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
+    .opt .opttext { white-space:pre-wrap; }
+    .optimg { max-height:220px; margin-top:8px; }
+    .btn { padding:12px 16px; border:none; background:var(--primary); color:#fff; font-weight:bold; border-radius:8px; cursor:pointer; }
+    .btn:disabled { opacity:0.7; cursor:not-allowed; }
+    .info { padding:10px; border:1px solid var(--border); background:#fff; border-radius:8px; }
+    .hidden { display:none; }
+    .result-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 720px) {
+      .row { grid-template-columns: 1fr; }
+      .result-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Ujian</h1>
+
+<div class="card">
+  <div class="row">
+    <div>
+      <label>Nama Siswa</label>
+      <input type="text" id="nama" placeholder="Nama lengkap" />
+    </div>
+    <div>
+      <label>Kelas</label>
+      <input type="text" id="kelas" placeholder="Kelas" />
+    </div>
+  </div>
+  <p style="margin-top:12px"><b>Instruksi:</b> Jawablah pertanyaan di bawah ini dengan benar!</p>
+  <button class="btn" id="btnLoad" onclick="loadSoal()">Muat Soal</button>
+</div>
+
+<div id="wrapSoal" class="hidden">
+  <div id="konten"></div>
+  <div class="card">
+    <button class="btn" id="btnKirim" onclick="kirim()">Kirim Jawaban</button>
+  </div>
+</div>
+
+<div id="hasil" class="card hidden"></div>
+
+<script>
+// ====== CONFIG (WAJIB DIISI) ======
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz9aJHtdRfpUGOr9yW_O49QHLfFTvxboQm9jNrOhw6SpSzfQHm05xCHJz7wzjUEBlOlnQ/exec"; // contoh: https://script.google.com/macros/s/AKfycb.../exec
+const API_TOKEN   = "soal2";                   // harus sama dgn API_TOKEN di Code.gs (atau "" jika dimatikan)
+
+// ====== Helper Drive URL ======
+function extractDriveId(u){
+  if(!u) return "";
+  try {
+    u = String(u).trim();
+    if(!u || u==="-" || u==="#" || u.toLowerCase()==="null" || u.toLowerCase()==="none") return "";
+    const m1 = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const m2 = u.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return (m1 && m1[1]) || (m2 && m2[1]) || "";
+  } catch { return ""; }
+}
+function toEmbed(u){
+  const id = extractDriveId(u);
+  return id ? "https://drive.google.com/uc?export=view&id="+id : (u||"");
+}
+function toThumb(u){
+  const id = extractDriveId(u);
+  return id ? "https://drive.google.com/thumbnail?id="+id+"&sz=w1200" : "";
+}
+
+// ====== STATE ======
+let BANK = [];
+let START_TS = null;
+let LAST_DURATION = 0;
+
+// ====== Util ======
+function escapeHtml(s){
+  return String(s || "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function formatDuration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return { m, s, text: `${m} menit ${s} detik` };
+}
+
+// ====== API helper (tanpa concat raw; aman & rapi) ======
+function buildURL(fn){
+  const base = (WEB_APP_URL || "").trim();
+  if (!/^https?:\/\//i.test(base)) {
+    throw new Error("WEB_APP_URL tidak valid. Pastikan diawali https:// dan bukan kosong.");
+  }
+  const u = new URL(base);
+  u.searchParams.set("fn", fn);
+  if (API_TOKEN) u.searchParams.set("token", API_TOKEN);
+  return u.toString();
+}
+async function apiGet(fn) {
+  const r = await fetch(buildURL(fn), { method: "GET" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+async function apiPost(fn, data) {
+  const r = await fetch(buildURL(fn), {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" }, // text/plain untuk hindari preflight
+    body: JSON.stringify(data || {})
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ====== Load Soal ======
+async function loadSoal(){
+  const nama = (document.getElementById("nama").value||"").trim();
+  const kelas = (document.getElementById("kelas").value||"").trim();
+  if (!nama || !kelas) {
+    alert("Isi Nama dan Kelas terlebih dahulu.");
+    return;
+  }
+  document.getElementById("btnLoad").disabled = true;
+
+  try {
+    const res = await apiGet("soal");
+    const rows = (res && res.ok && Array.isArray(res.rows)) ? res.rows : [];
+    if (!rows.length) {
+      alert("Belum ada soal pada sheet 'soal'.");
+      document.getElementById("btnLoad").disabled = false;
+      return;
+    }
+    BANK = rows;
+    START_TS = Date.now();
+    renderSoal();
+    document.getElementById("wrapSoal").classList.remove("hidden");
+    document.getElementById("hasil").classList.add("hidden");
+    document.getElementById("hasil").innerHTML = "";
+  } catch (err) {
+    alert("Gagal memuat soal: " + err.message);
+    document.getElementById("btnLoad").disabled = false;
+  }
+}
+
+function renderSoal(){
+  const host = document.getElementById("konten");
+  host.innerHTML = "";
+  BANK.forEach(q => {
+    const card = document.createElement("div");
+    card.className = "card question";
+
+    const judul = document.createElement("div");
+    judul.innerHTML = `<b>No ${q.No}.</b> ${escapeHtml(q.soal||"")}`;
+    card.appendChild(judul);
+
+    const qimgURL = toEmbed(q.gambar_soal);
+    if (qimgURL) {
+      const img = document.createElement("img");
+      img.className = "qimg";
+      img.alt = "gambar soal";
+      img.src = qimgURL;
+      img.onerror = function(){ const th = toThumb(q.gambar_soal); if (th && this.src !== th) this.src = th; };
+      card.appendChild(img);
+    }
+
+    const opts = document.createElement("div");
+    opts.className = "opts";
+    opts.appendChild(renderOpt(q.No, "a", q.opsi_a, q.gambar_a));
+    opts.appendChild(renderOpt(q.No, "b", q.opsi_b, q.gambar_b));
+    opts.appendChild(renderOpt(q.No, "c", q.opsi_c, q.gambar_c));
+    const hasD = (q.opsi_d || "").toString().trim() !== "" || !!toEmbed(q.gambar_d);
+    if (hasD) opts.appendChild(renderOpt(q.No, "d", q.opsi_d, q.gambar_d));
+
+    card.appendChild(opts);
+    host.appendChild(card);
+  });
+}
+
+function renderOpt(no, key, text, imgUrl){
+  const wrap = document.createElement("div");
+  wrap.className = "opt";
+  const id = `q${no}_${key}`;
+  const label = document.createElement("label");
+  label.setAttribute("for", id);
+
+  const radio = document.createElement("input");
+  radio.type = "radio";
+  radio.name = "q"+no;
+  radio.id = id;
+  radio.value = key;
+
+  const span = document.createElement("span");
+  span.className = "opttext";
+  span.textContent = text || "(kosong)";
+
+  label.appendChild(radio);
+  label.appendChild(span);
+  wrap.appendChild(label);
+
+  const u = toEmbed(imgUrl);
+  if (u) {
+    const img = document.createElement("img");
+    img.className = "optimg";
+    img.alt = `gambar opsi ${key.toUpperCase()}`;
+    img.src = u;
+    img.onerror = function(){ const th = toThumb(imgUrl); if (th && this.src !== th) this.src = th; };
+    wrap.appendChild(img);
+  }
+  return wrap;
+}
+
+// ====== Submit ======
+async function kirim(){
+  const nama = (document.getElementById("nama").value||"").trim();
+  const kelas = (document.getElementById("kelas").value||"").trim();
+  if (!nama || !kelas) { alert("Nama dan Kelas wajib diisi."); return; }
+
+  const answers = BANK.map(q => {
+    const picked = document.querySelector(`input[name="q${q.No}"]:checked`);
+    return { no: q.No, pilih: picked ? picked.value : "" };
+  });
+
+  const endTs = Date.now();
+  LAST_DURATION = START_TS ? Math.round((endTs - START_TS) / 1000) : 0;
+  const dt = formatDuration(LAST_DURATION);
+
+  const btn = document.getElementById("btnKirim");
+  btn.disabled = true; btn.textContent = "Mengirim...";
+
+  try {
+    const res = await apiPost("submit", {
+      nama, kelas, answers, durationSec: LAST_DURATION
+    });
+    btn.disabled = false; btn.textContent = "Kirim Jawaban";
+
+    const hasil = document.getElementById("hasil");
+    hasil.classList.remove("hidden");
+
+    const durText = (res && res.durasi_teks) ? res.durasi_teks : dt.text;
+
+    hasil.innerHTML = `
+      <div class="info">
+        <div class="result-grid">
+          <div>
+            <b>Total Soal:</b> ${res.totalSoal}<br>
+            <b>Total Nilai:</b> ${res.totalNilai}<br>
+            <b>Benar:</b> ${res.benar} &nbsp;|&nbsp;
+            <b>Salah:</b> ${res.salah} &nbsp;|&nbsp;
+            <b>Kosong:</b> ${res.kosong}
+          </div>
+          <div>
+            <b>Waktu Mengerjakan:</b> ${durText}
+          </div>
+        </div>
+      </div>
+      <div class="info" style="margin-top:10px;">
+        Terima kasih, <b>${escapeHtml(nama)}</b>. Tadi kamu mengerjakan dalam waktu <b>${durText}</b>.
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn" onclick="kerjakanLagi()">Kerjakan lagi</button>
+      </div>
+    `;
+
+    document.getElementById("wrapSoal").classList.add("hidden");
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Kirim Jawaban";
+    alert("Gagal mengirim: " + err.message);
+  }
+}
+
+function kerjakanLagi(){
+  BANK = [];
+  START_TS = null;
+  LAST_DURATION = 0;
+  document.getElementById("konten").innerHTML = "";
+  document.getElementById("wrapSoal").classList.add("hidden");
+  document.getElementById("hasil").classList.add("hidden");
+  document.getElementById("hasil").innerHTML = "";
+  document.getElementById("btnLoad").disabled = false;
+  loadSoal();
+}
+</script>
+</body>
+</html>
