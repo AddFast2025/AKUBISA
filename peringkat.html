@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <title>Peringkat Nilai (Self-hosted)</title>
+  <title>Peringkat Nilai</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root { --border:#e5e7eb; --muted:#f8fafc; --primary:#0d6efd; }
@@ -10,25 +10,29 @@
     h1 { text-align:center; margin: 0 0 16px; }
     .toolbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; gap:12px; }
     .btn { padding:10px 14px; border:none; background:var(--primary); color:#fff; font-weight:bold; border-radius:8px; cursor:pointer; }
-    .btn:disabled { opacity: .7; cursor:not-allowed; }
+    .btn:disabled { opacity:.7; cursor:not-allowed; }
     .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; }
-    table { width:100%; border-collapse:collapse; table-layout: fixed; }
-    th, td { padding:10px; border-bottom:1px solid var(--border); text-align:left; }
+
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    th, td { padding:10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
     th { background:#f3f4f6; }
-    tr:hover td { background:#fafafa; }
 
-    /* 3 kolom */
-    .col-no   { width: 60px; }
-    .col-main { width: auto; }
-    .col-stat { width: 160px; }
+    .col-no   { width:20px; }         /* kecil */
+    .col-main { width:auto; }         /* lebar */
+    .col-stat { width:40px; }        /* kecil */
 
-    .muted { color:#555; font-size: 13px; }
-    .empty { text-align:center; padding:20px; color:#666; white-space:nowrap; }
+    /* isi 2-baris dalam satu sel */
+    .cell { display:flex; flex-direction:column; gap:4px; }
+    .top  { font-size:15px; line-height:1.1; }
+    .sub  { font-size:13px; color:#555; line-height:1.1; }  /* lebih kecil */
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+    /* No hanya tampil di baris-atas; kita sembunyikan 'sub' di kolom No */
+    .no .sub { visibility:hidden; height:0; padding:0; margin:0; }
+
     @media (max-width: 640px) {
-      .col-no   { width: 56px; }
-      .col-stat { width: 140px; }
+      .col-no{ width:56px; }
+      .col-stat{ width:104px; }
     }
   </style>
 </head>
@@ -48,9 +52,9 @@
 <script>
 // ====== CONFIG ======
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz9aJHtdRfpUGOr9yW_O49QHLfFTvxboQm9jNrOhw6SpSzfQHm05xCHJz7wzjUEBlOlnQ/exec"; // ex: https://script.google.com/macros/s/AKfycb.../exec
-const API_TOKEN   = "soal2";                  // samakan dgn Code.gs
+const API_TOKEN   = "soal2";
 
-// ====== API helper ======
+// ====== API ======
 async function apiGet(fn) {
   const base = (WEB_APP_URL || "").trim();
   if (!/^https?:\/\//i.test(base)) throw new Error("WEB_APP_URL tidak valid.");
@@ -63,39 +67,26 @@ async function apiGet(fn) {
 }
 
 // ====== Utils ======
-function escapeHtml(s){
-  return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-function pad2(n){ return n < 10 ? "0"+n : String(n); }
-
-// terima "x menit y detik" / "mm:ss" / "hh:mm:ss"
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function pad2(n){ return n<10 ? "0"+n : String(n); }
 function parseDurasiToSec(txt){
   if (!txt) return null;
   const t = String(txt).trim().toLowerCase();
-
   const m = t.match(/(\d+)\s*menit/);
   const s = t.match(/(\d+)\s*detik/);
-  if (m || s) {
-    const mm = m ? parseInt(m[1],10) : 0;
-    const ss = s ? parseInt(s[1],10) : 0;
-    return (isNaN(mm)||isNaN(ss)) ? null : (mm*60+ss);
-  }
-
-  const parts = t.split(':').map(x => parseInt(x,10));
-  if (parts.some(isNaN)) return null;
-  if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
-  if (parts.length === 2) return parts[0]*60 + parts[1];
-  return null;
+  if (m || s) { const mm=m?parseInt(m[1],10):0; const ss=s?parseInt(s[1],10):0; return mm*60+ss; }
+  const p = t.split(':').map(x=>parseInt(x,10));
+  if (p.some(isNaN)) return null;
+  return p.length===3 ? p[0]*3600+p[1]*60+p[2] : p.length===2 ? p[0]*60+p[1] : null;
 }
-function formatMMSS(txt){
+function toMMSS(txt){
   const sec = parseDurasiToSec(txt);
-  if (sec == null) return "--:--";
-  const mm = Math.floor(sec/60);
-  const ss = sec % 60;
+  if (sec==null) return "--:--";
+  const mm = Math.floor(sec/60), ss = sec%60;
   return `${pad2(mm)}:${pad2(ss)}`;
 }
 
-// ====== UI logic ======
+// ====== UI ======
 async function loadData() {
   const btn = document.getElementById('btnReload');
   btn.disabled = true; btn.textContent = 'Memuat...';
@@ -103,8 +94,7 @@ async function loadData() {
     const res = await apiGet("peringkat");
     const rows = (res && res.ok && Array.isArray(res.rows)) ? res.rows : [];
     renderTable(rows);
-    document.getElementById('lastUpdate').textContent =
-      'Terakhir diperbarui: ' + new Date().toLocaleString();
+    document.getElementById('lastUpdate').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleString();
   } catch (err) {
     alert('Gagal memuat peringkat: ' + err.message);
   } finally {
@@ -114,10 +104,7 @@ async function loadData() {
 
 function renderTable(rows){
   const host = document.getElementById('container');
-  if (!rows.length) {
-    host.innerHTML = '<div class="empty">Belum ada data peringkat.</div>';
-    return;
-  }
+  if (!rows.length) { host.innerHTML = '<div class="empty">Belum ada data peringkat.</div>'; return; }
 
   const tbl = document.createElement('table');
 
@@ -125,24 +112,34 @@ function renderTable(rows){
   thead.innerHTML = `
     <tr>
       <th class="col-no">No</th>
-      <th class="col-main">Kelas - Nama</th>
-      <th class="col-stat">Nilai - Durasi</th>
-    </tr>
-  `;
+      <th class="col-main">Nama</th>
+      <th class="col-stat">Nilai</th>
+    </tr>`;
   tbl.appendChild(thead);
 
   const tbody = document.createElement('tbody');
   rows.forEach(r => {
-    const kelasNama = `${escapeHtml(r.kelas)} - ${escapeHtml(r.nama)}`;
-    const mmss = formatMMSS(r.durasi);
-    const nilaiDur = `<span class="mono">${r.nilai}</span> - <span class="mono">${mmss}</span>`;
-
+    const mmss = toMMSS(r.durasi);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="col-no">${r.peringkat}</td>
-      <td class="col-main">${kelasNama}</td>
-      <td class="col-stat">${nilaiDur}</td>
-    `;
+      <td class="col-no">
+        <div class="cell no">
+          <div class="top mono">${r.peringkat}</div>
+          <div class="sub mono">.</div>
+        </div>
+      </td>
+      <td class="col-main">
+        <div class="cell">
+          <div class="top">${escapeHtml(r.kelas).replace(/\b\w/g, c=>c.toUpperCase())}</div>
+          <div class="sub">${escapeHtml(r.nama)}</div>
+        </div>
+      </td>
+      <td class="col-stat">
+        <div class="cell">
+          <div class="top mono">${r.nilai}</div>
+          <div class="sub mono">${mmss}</div>
+        </div>
+      </td>`;
     tbody.appendChild(tr);
   });
   tbl.appendChild(tbody);
@@ -151,7 +148,6 @@ function renderTable(rows){
   host.appendChild(tbl);
 }
 
-// auto-load
 loadData();
 </script>
 </body>
