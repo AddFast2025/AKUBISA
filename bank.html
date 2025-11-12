@@ -41,13 +41,22 @@
 
   <!-- CONFIG client -->
   <script>
+  // Ganti URL ini dengan URL Web App /exec kamu
   const BASE_URL = "https://script.google.com/macros/s/AKfycby10-4S8FtAEzrinBTef9PTuJSHTR4dx3kYSm4EYbkLB7IVoflazLy8a8sB_aDvs4Qh/exec";
-  const API_KEY  = "soal1";
+  const API_KEY  = "soal1"; // samakan dengan Code.gs
+
+  function toForm(data) {
+    return Object.entries(data)
+      .map(([k,v]) => encodeURIComponent(k) + "=" + encodeURIComponent(typeof v === "object" ? JSON.stringify(v) : v))
+      .join("&");
+  }
+
   async function api(action, payload = {}) {
+    const body = toForm({ action, apiKey: API_KEY, ...payload });
     const res = await fetch(BASE_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY },
-      body: JSON.stringify({ action, ...payload })
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.ok) {
