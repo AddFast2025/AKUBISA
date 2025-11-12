@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Bank Soal (Lokal)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --border:#e5e7eb; --muted:#f1f5f9; --primary:#0d6efd; --success:#198754; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 980px; margin: auto; background:#fafafa; }
+    h1 { text-align: center; margin: 0 0 12px; }
+    .toolbar { display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:end; margin: 10px 0 18px; }
+    label { font-weight: bold; display:block; margin-bottom: 6px; }
+    select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; background:#fff; }
+    .meta { display:flex; gap:10px; flex-wrap:wrap; margin: 6px 0 14px; }
+    .pill { background: var(--muted); border-radius: 999px; padding: 6px 10px; }
+    .list { display: grid; gap: 12px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; display:grid; gap:10px; }
+    .qtext { font-weight:600; white-space:pre-wrap; }
+    .qimg, .optimg { max-width:100%; object-fit:contain; border-radius:8px; }
+    .qimg { max-height:300px; }
+    .opts { display:grid; gap:10px; }
+    .opt { border:1px solid var(--border); border-radius:10px; padding:10px; background:#fff; display:grid; grid-template-columns: 64px 1fr; gap:10px; align-items:center; }
+    .opt.key { background:#e7f7ee; border-color:#b5e4c7; }
+    .badge { width:40px; height:40px; border-radius:999px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold; background:var(--primary); }
+    .opt.key .badge { background: var(--success); }
+    .opttext { white-space:pre-wrap; }
+    .optimg { grid-column: 1 / -1; max-width:100%; max-height:220px; border-radius:8px; object-fit:contain; justify-self:start; }
+    .stats { color:#555; font-size:14px; }
+    .pagination { display:flex; gap:8px; justify-content:center; margin:18px 0 6px; flex-wrap:wrap; }
+    .pagebtn { padding:8px 12px; border:1px solid var(--border); background:#fff; border-radius:8px; cursor:pointer; }
+    .pagebtn[disabled], .pagebtn.active { background: var(--primary); color:#fff; border-color: var(--primary); cursor:default; }
+    .empty { padding:20px; text-align:center; border:1px dashed var(--border); border-radius:12px; background:#fff; color:#666; }
+    .meta-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .delbtn { margin-left:auto; background:#dc3545; color:#fff; border:none; padding:6px 10px; border-radius:8px; cursor:pointer; }
+    .delbtn:hover { filter: brightness(0.95); }
+    @media (max-width: 720px) { .opt { grid-template-columns: 40px 1fr; } .optimg { max-height:180px; } }
+  </style>
+</head>
+<body>
+  <h1>Bank Soal</h1>
+
+  <!-- CONFIG client -->
+  <script>
+  const BASE_URL = "https://script.google.com/macros/s/AKfycby10-4S8FtAEzrinBTef9PTuJSHTR4dx3kYSm4EYbkLB7IVoflazLy8a8sB_aDvs4Qh/exec";
+  const API_KEY  = "soal1";
+  async function api(action, payload = {}) {
+    const res = await fetch(BASE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      const msg = json?.data?.message || json?.message || res.statusText;
+      throw new Error(msg || "Request failed");
+    }
+    return json.data;
+  }
+  </script>
+
+  <div class="toolbar">
+    <div>
+      <label>Pilih Kisi-kisi</label>
+      <select id="kisi" onchange="onChangeKisi()"></select>
+    </div>
+    <div>
+      <label>Cari (soal & opsi)</label>
+      <input type="text" id="q" placeholder="ketik kata kunci..." oninput="applyFilter()" />
+    </div>
+  </div>
+
+  <div class="meta">
+    <div class="pill">Total: <b id="total">0</b></div>
+    <div class="pill">Tampil: <b id="shown">0</b></div>
+    <div class="pill">Halaman: <b id="pageInfo">-</b></div>
+  </div>
+
+  <div id="list" class="list"></div>
+  <div id="empty" class="empty" style="display:none;">Silakan pilih kisi-kisi terlebih dahulu.</div>
+
+  <div id="pagination" class="pagination"></div>
+
+<script>
+/* ===== Helper Google Drive URL ===== */
+function extractDriveId(u){ if(!u) return ""; try{ u=String(u).trim(); if(!u||u==="-"||u==="#"||u.toLowerCase()==="null"||u.toLowerCase()==="none") return ""; const m1=u.match(/\/d\/([a-zA-Z0-9_-]+)/); const m2=u.match(/[?&]id=([a-zA-Z0-9_-]+)/); return (m1&&m1[1])||(m2&&m2[1])||""; }catch{ return ""; } }
+function driveEmbedUrl(id){ return id ? "https://drive.google.com/uc?export=view&id="+id : ""; }
+function driveThumbUrl(id, size="w1200"){ return id ? "https://drive.google.com/thumbnail?id="+id+"&sz="+size : ""; }
+function normalizeDrive(u){ const id=extractDriveId(u); return id ? {id, embed:driveEmbedUrl(id), thumb:driveThumbUrl(id)} : {id:"", embed:"", thumb:""}; }
+
+/* ===== STATE ===== */
+let ALL = [];
+let FILTERED = [];
+let PAGE = 1;
+const PER_PAGE = 10;
+
+/* ===== INIT dropdown ===== */
+(async function initSheets(){
+  const sel = document.getElementById("kisi");
+  sel.innerHTML = "<option value=''>-- pilih kisi-kisi --</option>";
+  try {
+    const { sheets } = await api("getsheets");
+    (sheets || []).forEach(n => {
+      const opt = document.createElement("option");
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    alert("Gagal memuat daftar kisi: " + e.message);
+  }
+})();
+
+/* ===== LOAD DATA ===== */
+async function onChangeKisi() {
+  const kisi = document.getElementById("kisi").value;
+  PAGE = 1;
+  document.getElementById("list").innerHTML = "";
+  document.getElementById("pagination").innerHTML = "";
+  document.getElementById("total").textContent = "0";
+  document.getElementById("shown").textContent = "0";
+  document.getElementById("pageInfo").textContent = "-";
+
+  if (!kisi) {
+    const empty = document.getElementById("empty");
+    empty.textContent = "Silakan pilih kisi-kisi terlebih dahulu.";
+    empty.style.display = "block";
+    return;
+  }
+  document.getElementById("empty").style.display = "none";
+
+  try {
+    const { rows } = await api("getsoal", { nama: kisi });
+    ALL = Array.isArray(rows) ? rows : [];
+    applyFilter();
+  } catch (e) {
+    alert("Gagal memuat soal: " + e.message);
+  }
+}
+
+/* ===== FILTER + RENDER ===== */
+function applyFilter() {
+  const q = (document.getElementById("q").value || "").toLowerCase().trim();
+  FILTERED = !q ? ALL.slice() : ALL.filter(it => {
+    const fields = [it.soal, it["opsi a"], it["opsi b"], it["opsi c"], it["opsi d"]].map(x => (x || "").toString().toLowerCase());
+    return fields.some(t => t.includes(q));
+  });
+  PAGE = 1;
+  render();
+}
+function render() {
+  const total = ALL.length, shown = FILTERED.length;
+  document.getElementById("total").textContent = total;
+  document.getElementById("shown").textContent = shown;
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  if (shown === 0) {
+    document.getElementById("empty").style.display = "block";
+    document.getElementById("pagination").innerHTML = "";
+    document.getElementById("pageInfo").textContent = "-";
+    return;
+  }
+  document.getElementById("empty").style.display = "none";
+
+  const pages = Math.max(1, Math.ceil(shown / PER_PAGE));
+  if (PAGE > pages) PAGE = pages;
+
+  const start = (PAGE - 1) * PER_PAGE;
+  const end = Math.min(shown, start + PER_PAGE);
+  const slice = FILTERED.slice(start, end);
+
+  slice.forEach(row => list.appendChild(renderCard(row)));
+  document.getElementById("pageInfo").textContent = PAGE + " / " + pages;
+  renderPagination(pages);
+}
+
+/* ===== CARD ===== */
+function renderCard(row) {
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const meta = document.createElement("div");
+  meta.className = "stats meta-row";
+  const noVal = row["No"] ?? "-";
+  meta.innerHTML = `
+    <span><b>No:</b> ${noVal}</span>
+    <span>|</span>
+    <span><b>Skor:</b> ${row["skor"] ?? "-"}</span>
+    <span>|</span>
+    <span><b>Kunci:</b> ${(row["kunci"] || "-").toString().toUpperCase()}</span>
+  `;
+  const del = document.createElement("button");
+  del.className = "delbtn";
+  del.textContent = "Hapus";
+  del.onclick = () => onDeleteSoal(noVal);
+  meta.appendChild(del);
+  card.appendChild(meta);
+
+  const qtext = document.createElement("div");
+  qtext.className = "qtext";
+  qtext.textContent = row["soal"] || "(tanpa teks soal)";
+  card.appendChild(qtext);
+
+  const soalDrv = normalizeDrive(row["gambar_soal"]);
+  if (soalDrv.embed) {
+    const qimg = document.createElement("img");
+    qimg.src = soalDrv.embed;
+    qimg.alt = "gambar soal";
+    qimg.className = "qimg";
+    qimg.onerror = function(){ if (this.src !== soalDrv.thumb && soalDrv.thumb) this.src = soalDrv.thumb; };
+    card.appendChild(qimg);
+
+    const a = document.createElement("a");
+    a.href = soalDrv.embed; a.target = "_blank";
+    a.textContent = "Buka gambar";
+    a.style.fontSize = "12px"; a.style.color = "#0d6efd";
+    card.appendChild(a);
+  }
+
+  const opts = document.createElement("div");
+  opts.className = "opts";
+  opts.appendChild(renderOpt("a", row["opsi a"], row["gambar_a"], row["kunci"]));
+  opts.appendChild(renderOpt("b", row["opsi b"], row["gambar_b"], row["kunci"]));
+  opts.appendChild(renderOpt("c", row["opsi c"], row["gambar_c"], row["kunci"]));
+  const dDrv = normalizeDrive(row["gambar_d"]);
+  const hasDText = (row["opsi d"] || "").toString().trim() !== "";
+  const hasDImg  = !!dDrv.embed;
+  if (hasDText || hasDImg) opts.appendChild(renderOpt("d", row["opsi d"], row["gambar_d"], row["kunci"]));
+  card.appendChild(opts);
+
+  return card;
+}
+function renderOpt(letter, text, imgUrl, kunci) {
+  const isKey = (kunci || "").toString().toLowerCase() === letter;
+  const box = document.createElement("div");
+  box.className = "opt" + (isKey ? " key" : "");
+
+  const badge = document.createElement("div");
+  badge.className = "badge";
+  badge.textContent = letter.toUpperCase();
+
+  const t = document.createElement("div");
+  t.className = "opttext";
+  t.textContent = text || "(kosong)";
+
+  box.appendChild(badge);
+  box.appendChild(t);
+
+  const drv = normalizeDrive(imgUrl);
+  if (drv.embed) {
+    const img = document.createElement("img");
+    img.className = "optimg";
+    img.alt = "gambar opsi " + letter.toUpperCase();
+    img.src = drv.embed;
+    img.onerror = function(){ if (this.src !== drv.thumb && drv.thumb) this.src = drv.thumb; };
+    box.appendChild(img);
+  }
+  return box;
+}
+
+/* ===== PAGINATION ===== */
+function renderPagination(pages) {
+  const host = document.getElementById("pagination");
+  host.innerHTML = "";
+  const mkBtn = (label, onClick, disabled=false, active=false) => {
+    const b = document.createElement("button");
+    b.className = "pagebtn" + (active ? " active":"");
+    b.textContent = label;
+    if (disabled) b.disabled = true;
+    if (!disabled && !active) b.addEventListener("click", onClick);
+    return b;
+  };
+  host.appendChild(mkBtn("«", () => { PAGE=1; render(); }, PAGE===1));
+  host.appendChild(mkBtn("‹", () => { PAGE=Math.max(1,PAGE-1); render(); }, PAGE===1));
+  const start = Math.max(1, PAGE-2);
+  const end = Math.min(pages, PAGE+2);
+  for (let p=start; p<=end; p++) host.appendChild(mkBtn(String(p), () => { PAGE=p; render(); }, false, p===PAGE));
+  host.appendChild(mkBtn("›", () => { PAGE=Math.min(pages,PAGE+1); render(); }, PAGE===pages));
+  host.appendChild(mkBtn("»", () => { PAGE=pages; render(); }, PAGE===pages));
+}
+
+/* ===== HAPUS SOAL ===== */
+async function onDeleteSoal(no) {
+  const kisi = document.getElementById("kisi").value;
+  if (!kisi) return alert("Pilih kisi-kisi dahulu.");
+  if (!confirm("Yakin hapus Soal No " + no + "?")) return;
+  try {
+    const resp = await api("hapussoal", { kisi, no: Number(no) });
+    alert(resp.message || "Terhapus.");
+    onChangeKisi();
+  } catch (e) {
+    alert("Gagal menghapus: " + e.message);
+  }
+}
+</script>
+</body>
+</html>
