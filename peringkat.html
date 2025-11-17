@@ -64,7 +64,7 @@
     type="text"
     id="searchBox"
     class="search-input"
-    placeholder="Cari berdasarkan peringkat, kelas, nama, nilai, atau durasi..."
+    placeholder="Cari ..."
   />
 </div>
 
@@ -164,7 +164,7 @@ function applyFilter() {
 function renderTable(rows){
   const host = document.getElementById('container');
   if (!rows.length) {
-    host.innerHTML = '<div class="empty">Belum ada data peringkat atau tidak ada hasil untuk pencarian ini.</div>';
+    host.innerHTML = '<div class="empty">Tidak ada hasil untuk pencarian ini.</div>';
     return;
   }
 
