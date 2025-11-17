@@ -8,10 +8,23 @@
     :root { --border:#e5e7eb; --muted:#f8fafc; --primary:#0d6efd; }
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; background:#fafafa; }
     h1 { text-align:center; margin: 0 0 16px; }
-    .toolbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 16px; gap:12px; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 8px; gap:12px; }
     .btn { padding:10px 14px; border:none; background:var(--primary); color:#fff; font-weight:bold; border-radius:8px; cursor:pointer; }
     .btn:disabled { opacity:.7; cursor:not-allowed; }
     .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; }
+
+    /* --- kotak pencarian --- */
+    .search-row {
+      margin: 0 0 12px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      box-sizing: border-box;
+    }
 
     table { width:100%; border-collapse:collapse; table-layout:fixed; }
     th, td { padding:10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
@@ -45,6 +58,16 @@
   <button class="btn" id="btnReload" onclick="loadData()">Muat Ulang</button>
 </div>
 
+<!-- KOTAK PENCARIAN: DI BAWAH TOMBOL, DI ATAS TABEL -->
+<div class="search-row">
+  <input
+    type="text"
+    id="searchBox"
+    class="search-input"
+    placeholder="Cari berdasarkan peringkat, kelas, nama, nilai, atau durasi..."
+  />
+</div>
+
 <div class="card">
   <div id="container"></div>
 </div>
@@ -53,6 +76,9 @@
 // ====== CONFIG ======
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz9aJHtdRfpUGOr9yW_O49QHLfFTvxboQm9jNrOhw6SpSzfQHm05xCHJz7wzjUEBlOlnQ/exec"; // ex: https://script.google.com/macros/s/AKfycb.../exec
 const API_TOKEN   = "soal2";
+
+// simpan semua data asli untuk keperluan filter
+let ALL_ROWS = [];
 
 // ====== API ======
 async function apiGet(fn) {
@@ -93,7 +119,8 @@ async function loadData() {
   try {
     const res = await apiGet("peringkat");
     const rows = (res && res.ok && Array.isArray(res.rows)) ? res.rows : [];
-    renderTable(rows);
+    ALL_ROWS = rows;              // simpan data asli
+    applyFilter();                // render berdasarkan isi kotak pencarian saat ini
     document.getElementById('lastUpdate').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleString();
   } catch (err) {
     alert('Gagal memuat peringkat: ' + err.message);
@@ -102,9 +129,44 @@ async function loadData() {
   }
 }
 
+// Filter berdasarkan semua kolom
+function applyFilter() {
+  const hostInput = document.getElementById('searchBox');
+  const q = (hostInput ? hostInput.value : '').trim().toLowerCase();
+
+  if (!ALL_ROWS.length) {
+    renderTable([]);
+    return;
+  }
+
+  if (!q) {
+    // jika kosong, tampilkan semua
+    renderTable(ALL_ROWS);
+    return;
+  }
+
+  const filtered = ALL_ROWS.filter(r => {
+    const values = [
+      r.peringkat,
+      r.kelas,
+      r.nama,
+      r.nilai,
+      r.durasi,
+      toMMSS(r.durasi)
+    ].map(v => (v == null ? '' : String(v).toLowerCase()));
+
+    return values.some(v => v.includes(q));
+  });
+
+  renderTable(filtered);
+}
+
 function renderTable(rows){
   const host = document.getElementById('container');
-  if (!rows.length) { host.innerHTML = '<div class="empty">Belum ada data peringkat.</div>'; return; }
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty">Belum ada data peringkat atau tidak ada hasil untuk pencarian ini.</div>';
+    return;
+  }
 
   const tbl = document.createElement('table');
 
@@ -148,6 +210,10 @@ function renderTable(rows){
   host.appendChild(tbl);
 }
 
+// event pencarian real-time
+document.getElementById('searchBox').addEventListener('input', applyFilter);
+
+// load awal
 loadData();
 </script>
 </body>
