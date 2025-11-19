@@ -8,14 +8,20 @@
     :root { --border:#e5e7eb; --muted:#f8fafc; --primary:#0d6efd; }
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 960px; margin: auto; background:#fafafa; }
     h1 { text-align:center; margin:0 0 16px; }
+P { text-align:center; margin:0 0 10px; }
     .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:12px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     label { font-weight:bold; display:block; margin-bottom:6px; }
-    input[type="text"] { width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; }
+    input[type="text"], select {
+      width:100%;
+      padding:10px;
+      border:1px solid #ccc;
+      border-radius:6px;
+    }
     .qimg, .optimg { max-width:100%; border-radius:8px; object-fit:contain; }
     .qimg { max-height:300px; margin-top:8px; }
-    .question { display:grid; gap:10px; font-size: 24px;}
-    .opts { display:grid; gap:8px;font-size: 24px; }
+    .question { display:grid; gap:10px;font-size: 24px; }
+    .opts { display:grid; gap:8px; font-size: 24px;}
     .opt { border:1px solid var(--border); border-radius:10px; padding:10px; background:#fff; }
     .opt label { font-weight:normal; display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
     .opt .opttext { white-space:pre-wrap; }
@@ -33,7 +39,8 @@
 </head>
 <body>
 
-<h1>Ujian</h1>
+<h1>Latihan Soal</h1>
+<P>IGTKI KECAMATAN BALEN</P>
 
 <div class="card">
   <div class="row">
@@ -43,7 +50,9 @@
     </div>
     <div>
       <label>Kelas</label>
-      <input type="text" id="kelas" placeholder="Kelas" />
+      <select id="kelas">
+        <option value="">Memuat daftar kelas...</option>
+      </select>
     </div>
   </div>
   <p style="margin-top:12px"><b>Instruksi:</b> Jawablah pertanyaan di bawah ini dengan benar!</p>
@@ -61,7 +70,7 @@
 
 <script>
 // ====== CONFIG (WAJIB DIISI) ======
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz9aJHtdRfpUGOr9yW_O49QHLfFTvxboQm9jNrOhw6SpSzfQHm05xCHJz7wzjUEBlOlnQ/exec"; // contoh: https://script.google.com/macros/s/AKfycb.../exec
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz9aJHtdRfpUGOr9yW_O49QHLfFTvxboQm9jNrOhw6SpSzfQHm05xCHJz7wzjUEBlOlnQ/exec"; // ganti dengan URL Web App kamu
 const API_TOKEN   = "soal2";                   // harus sama dgn API_TOKEN di Code.gs (atau "" jika dimatikan)
 
 // ====== Helper Drive URL ======
@@ -124,6 +133,35 @@ async function apiPost(fn, data) {
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
+}
+
+// ====== Load Kelas dari API (sheet nama_TK) ======
+async function loadKelas(){
+  const sel = document.getElementById("kelas");
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">Memuat daftar kelas...</option>';
+
+  try {
+    const res  = await apiGet("kelas");
+    const rows = (res && res.ok && Array.isArray(res.rows)) ? res.rows : [];
+
+    if (!rows.length) {
+      sel.innerHTML = '<option value="">(Belum ada data kelas)</option>';
+      return;
+    }
+
+    sel.innerHTML = '<option value="">Pilih Kelas</option>';
+    rows.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.nama;
+      opt.textContent = r.nama;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    console.error(err);
+    sel.innerHTML = '<option value="">Gagal memuat kelas</option>';
+  }
 }
 
 // ====== Load Soal ======
@@ -293,6 +331,11 @@ function kerjakanLagi(){
   document.getElementById("btnLoad").disabled = false;
   loadSoal();
 }
+
+// ====== Init saat halaman dibuka ======
+window.addEventListener("DOMContentLoaded", () => {
+  loadKelas(); // ambil daftar kelas dari sheet nama_TK
+});
 </script>
 </body>
 </html>
